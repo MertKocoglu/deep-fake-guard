@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deepfake Speech Detection - AI Powered</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="48" height="48" class="me-2">
+                DeepFakeGuard
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text">
+                    <i class="fas fa-shield-alt text-success me-1"></i>
+                    
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8 text-center">
+                    <h1 class="display-4 fw-bold mb-4">
+                        Deepfake Speech Detection
+                    </h1>
+                    <p class="lead mb-5">
+                        Upload your Speech file and let our AI-powered system analyze whether it's bona fide or artificially generated.
+                        Using state-of-the-art CNN technology.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container my-5">
+        <!-- Upload Section -->
+        <div id="upload-section" class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow-lg border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-upload me-2"></i>
+                            Upload Speech File
+                        </h3>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="upload-area" id="upload-area">
+                            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                            <h4>Drag & Drop Speech File Here</h4>
+                            <p class="text-muted">or click to browse</p>
+                            <input type="file" id="file-input" accept=".wav,.mp3,.flac,.m4a,.ogg" style="display: none;">
+                        </div>
+                        
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Supported formats: WAV, MP3, FLAC, M4A, OGG • Max size: 16MB • Duration: up to 2 seconds
+                            </small>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button id="analyze-btn" class="btn btn-success btn-lg w-100" disabled>
+                                <i class="fas fa-search me-2"></i>
+                                Analyze Speech
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Section -->
+        <div id="loading-section" class="row justify-content-center" style="display: none;">
+            <div class="col-lg-8">
+                <div class="card shadow-lg border-0">
+                    <div class="card-body text-center p-5">
+                        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h4>Analyzing Speech...</h4>
+                        <p class="text-muted">Our AI is processing your file. This may take a few seconds.</p>
+                        <div class="progress mt-3">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" class="row justify-content-center" style="display: none;">
+            <div class="col-lg-10">
+                <!-- Result Card -->
+                <div class="card shadow-lg border-0 mb-4">
+                    <div class="card-header" id="result-header">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-chart-line me-2"></i>
+                            Detection Results
+                        </h3>
+                    </div>
+                    <div class="card-body p-4">
+                        <!-- Main Result -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="result-box" id="main-result">
+                                    <div class="result-icon" id="result-icon">
+                                        <i class="fas fa-question"></i>
+                                    </div>
+                                    <h2 id="result-text">Processing...</h2>
+                                    <p class="confidence" id="confidence-text">Confidence: --</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="file-info">
+                                    <h5><i class="fas fa-file-audio me-2"></i>File Information</h5>
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td><strong>Filename:</strong></td>
+                                            <td id="file-name">--</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Duration:</strong></td>
+                                            <td id="file-duration">--</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Size:</strong></td>
+                                            <td id="file-size">--</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Probability:</strong></td>
+                                            <td id="raw-probability">--</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Technical Details -->
+                        <div class="mt-4">
+                            <h5><i class="fas fa-cogs me-2"></i>Technical Analysis</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="tech-detail">
+                                        <span class="badge bg-info">Model Used</span>
+                                        <span>Advanced CNN</span>
+                                    </div>
+                                    <div class="tech-detail">
+                                        <span class="badge bg-info">Threshold</span>
+                                        <span id="threshold-used">0.0001</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="tech-detail">
+                                        <span class="badge bg-info">Analysis Method</span>
+                                        <span>Mel-Spectrogram CNN</span>
+                                    </div>
+                                    <div class="tech-detail">
+                                        <span class="badge bg-info">Model F1-Score</span>
+                                        <span>89.8%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visualization -->
+                        <div class="mt-4">
+                            <h5><i class="fas fa-chart-area me-2"></i>Speech Visualization</h5>
+                            <div class="text-center">
+                                <img id="spectrogram-plot" src="" alt="Speech Analysis" class="img-fluid rounded shadow">
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="mt-4 text-center">
+                            <button id="download-report-btn" class="btn btn-primary btn-lg me-3">
+                                <i class="fas fa-download me-2"></i>
+                                Download Report (TXT)
+                            </button>
+                            <button id="analyze-another-btn" class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-redo me-2"></i>
+                                Analyze Another File
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5><i class="fas fa-shield-alt me-2"></i>DeepFakeGuard</h5>
+                    <p class="mb-0">DeepFake Speech Detection System</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0">
+                        <small>
+                            <i class="fas fa-brain me-1"></i>
+                            Powered by TensorFlow & Advanced CNN
+                            <br>
+                            Accuracy: 90% • F1-Score: 89.8%
+                        </small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Error Modal -->
+    <div class="modal fade" id="errorModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Error
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="error-message">An error occurred.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
