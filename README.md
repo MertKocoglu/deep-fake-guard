@@ -1,4 +1,4 @@
-# 🎵 Deepfake Audio Detection System
+# 🎵 Deepfake Speech Detection System
 
 AI-powered deepfake audio detection system with advanced CNN model achieving 90% accuracy and modern web interface.
 
