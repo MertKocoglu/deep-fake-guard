@@ -223,11 +223,16 @@ async function generateReport() {
             throw new Error(result.error);
         }
         
-        // Download the report
-        window.open(result.report_url, '_blank');
+        // Download the report using a temporary link
+        const link = document.createElement('a');
+        link.href = result.report_url;
+        link.download = ''; // Browser will use filename from Content-Disposition header
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         
         // Show success message
-        showSuccess('Report generated successfully!');
+        showSuccess('Report downloaded successfully!');
         
     } catch (error) {
         console.error('Report generation error:', error);
