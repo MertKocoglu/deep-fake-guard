@@ -15,10 +15,12 @@ import uuid
 import librosa
 import numpy as np
 import tensorflow as tf
-from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+from datetime import datetime, timedelta
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session
 from werkzeug.utils import secure_filename
+from functools import wraps
 import pickle
+from database import db, User, AnalysisHistory, init_db
 import matplotlib
 matplotlib.use('Agg')  # For non-interactive backend
 import matplotlib.pyplot as plt
@@ -40,13 +42,34 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'deepfake-detection-2025'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+
+# Database configuration
+# PostgreSQL for production-ready deployment
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'postgresql://ardaaltc@localhost/deepfake_guard'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ECHO'] = False
 
 # Create uploads directory
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+# Initialize database
+init_db(app)
+
 # Global variables for model and scaler
 model = None
 scaler = None
+
+def login_required(f):
+    """Decorator to require login for routes."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 def load_model_and_scaler():
     """Load the trained model and scaler."""
@@ -306,11 +329,112 @@ def generate_pdf_report(result_data):
     return filename
 
 @app.route('/')
+@login_required
 def index():
     """Main page with file upload."""
-    return render_template('index.html')
+    return render_template('index.html', username=session.get('username'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page."""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        print(f"Login attempt - Username: {username}")
+        
+        # Query user from database
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password) and user.is_active:
+            session.clear()
+            session['logged_in'] = True
+            session['username'] = user.username
+            session['user_id'] = user.id
+            session['user_role'] = user.role
+            session.permanent = True
+            
+            # Update last login
+            user.update_last_login()
+            
+            print(f"✅ Login successful for user: {username}")
+            return redirect(url_for('index'))
+        else:
+            print(f"❌ Login failed for user: {username}")
+            return render_template('login.html', error='Invalid username or password')
+    
+    # Check if already logged in
+    if 'logged_in' in session:
+        print(f"User {session.get('username')} already logged in, redirecting to index")
+        return redirect(url_for('index'))
+    
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Register new user."""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        full_name = request.form.get('full_name')
+        password = request.form.get('password')
+        password_confirm = request.form.get('password_confirm')
+        
+        # Validation
+        if not all([username, email, full_name, password, password_confirm]):
+            return render_template('register.html', error='Tüm alanları doldurun')
+        
+        if password != password_confirm:
+            return render_template('register.html', error='Şifreler eşleşmiyor')
+        
+        if len(password) < 6:
+            return render_template('register.html', error='Şifre en az 6 karakter olmalı')
+        
+        # Check if username already exists
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user:
+            return render_template('register.html', error='Bu kullanıcı adı zaten kullanılıyor')
+        
+        # Check if email already exists
+        existing_email = User.query.filter_by(email=email).first()
+        if existing_email:
+            return render_template('register.html', error='Bu e-posta adresi zaten kayıtlı')
+        
+        try:
+            # Create new user
+            new_user = User(
+                username=username,
+                email=email,
+                full_name=full_name,
+                role='user'
+            )
+            new_user.set_password(password)
+            
+            db.session.add(new_user)
+            db.session.commit()
+            
+            print(f"✅ New user registered: {username}")
+            return render_template('register.html', success='Hesabınız başarıyla oluşturuldu! Şimdi giriş yapabilirsiniz.')
+        
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Error registering user: {e}")
+            return render_template('register.html', error='Kayıt sırasında bir hata oluştu')
+    
+    # Check if already logged in
+    if 'logged_in' in session:
+        return redirect(url_for('index'))
+    
+    return render_template('register.html')
+
+@app.route('/logout')
+def logout():
+    """Logout user."""
+    session.clear()
+    return redirect(url_for('login'))
 
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     """Handle file upload and process audio."""
     if 'file' not in request.files:
@@ -360,6 +484,25 @@ def upload_file():
             'duration': len(audio) / sr
         }
         
+        # Save analysis to database
+        try:
+            analysis = AnalysisHistory(
+                user_id=session.get('user_id'),
+                filename=filename,
+                file_size=response_data['file_size'],
+                duration=response_data['duration'],
+                is_fake=result['is_fake'],
+                confidence=result['confidence'],
+                raw_probability=result['raw_probability'],
+                threshold_used=result['threshold_used']
+            )
+            db.session.add(analysis)
+            db.session.commit()
+            print(f"✅ Analysis saved to database for user {session.get('username')}")
+        except Exception as db_error:
+            print(f"⚠️  Error saving to database: {db_error}")
+            db.session.rollback()
+        
         # Clean up uploaded file
         os.remove(filepath)
         
@@ -370,27 +513,165 @@ def upload_file():
         return jsonify({'error': f'Error processing file: {str(e)}'}), 500
 
 @app.route('/generate_report', methods=['POST'])
+@login_required
 def generate_report():
-    """Generate and download PDF report."""
+    """Generate and download TXT report."""
     try:
         data = request.json
+        print(f"📝 Generating report for: {data.get('filename')}")
         
-        # Generate PDF report
-        pdf_filename = generate_pdf_report(data)
-        pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+        # Generate TXT report
+        filename = f"deepfake_detection_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        # Create report content
+        result_text = "REAL AUDIO" if not data['is_fake'] else "DEEPFAKE AUDIO"
+        report_content = f"""
+╔══════════════════════════════════════════════════════════════╗
+║        DEEPFAKE AUDIO DETECTION REPORT                       ║
+╚══════════════════════════════════════════════════════════════╝
+
+Report Generated: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+Analysis Model: Advanced CNN (90% Accuracy)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FILE INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File Name:        {data['filename']}
+File Size:        {data.get('file_size', 0) / 1024:.2f} KB
+Duration:         {data.get('duration', 0):.2f} seconds
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DETECTION RESULTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Classification:   *** {result_text} ***
+Confidence:       {data['confidence']:.1f}%
+Raw Probability:  {data['raw_probability']:.6f}
+Threshold Used:   {data['threshold_used']:.6f}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TECHNICAL DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Model Type:       Convolutional Neural Network (CNN)
+Model Accuracy:   90.0%
+F1 Score:         89.8%
+Feature Type:     Mel-Spectrogram
+
+Analysis Method:
+The audio file was processed using advanced machine learning
+techniques. The system extracts mel-spectrogram features and
+analyzes them using a trained CNN model.
+
+Confidence Interpretation:
+The confidence level indicates how certain the model is about
+its prediction. Higher confidence values suggest more reliable
+results.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DISCLAIMER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This analysis is based on state-of-the-art deepfake detection
+technology. For critical applications, we recommend additional
+verification methods.
+
+Generated by DeepFake Guard v1.0
+User: {session.get('username')}
+Report ID: {filename.replace('.txt', '')}
+"""
+        
+        # Write report to file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(report_content)
+        
+        print(f"✅ Report generated: {filename}")
         
         return jsonify({
             'success': True,
-            'report_url': f'/download_report/{pdf_filename}'
+            'report_url': f'/download_report/{filename}'
         })
     
     except Exception as e:
-        print(f"Error generating report: {e}")
+        print(f"❌ Error generating report: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Error generating report: {str(e)}'}), 500
 
 @app.route('/download_report/<filename>')
+@login_required
 def download_report(filename):
     """Download generated PDF report."""
+    try:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        return send_file(filepath, as_attachment=True, download_name=filename)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
+
+@app.route('/api/history')
+@login_required
+def get_history():
+    """Get user's analysis history."""
+    try:
+        user_id = session.get('user_id')
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        # Query user's analysis history with pagination
+        pagination = AnalysisHistory.query.filter_by(user_id=user_id)\
+            .order_by(AnalysisHistory.analyzed_at.desc())\
+            .paginate(page=page, per_page=per_page, error_out=False)
+        
+        history_data = []
+        for analysis in pagination.items:
+            history_data.append({
+                'id': analysis.id,
+                'filename': analysis.filename,
+                'is_fake': analysis.is_fake,
+                'confidence': analysis.confidence,
+                'file_size': analysis.file_size,
+                'duration': analysis.duration,
+                'analyzed_at': analysis.analyzed_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        return jsonify({
+            'history': history_data,
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'current_page': page
+        })
+    
+    except Exception as e:
+        print(f"Error fetching history: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/stats')
+@login_required
+def get_stats():
+    """Get user's analysis statistics."""
+    try:
+        user_id = session.get('user_id')
+        
+        total_analyses = AnalysisHistory.query.filter_by(user_id=user_id).count()
+        fake_count = AnalysisHistory.query.filter_by(user_id=user_id, is_fake=True).count()
+        real_count = total_analyses - fake_count
+        
+        # Get average confidence
+        analyses = AnalysisHistory.query.filter_by(user_id=user_id).all()
+        avg_confidence = sum(a.confidence for a in analyses) / len(analyses) if analyses else 0
+        
+        return jsonify({
+            'total_analyses': total_analyses,
+            'fake_count': fake_count,
+            'real_count': real_count,
+            'avg_confidence': round(avg_confidence, 2)
+        })
+    
+    except Exception as e:
+        print(f"Error fetching stats: {e}")
+        return jsonify({'error': str(e)}), 500
     try:
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         return send_file(filepath, as_attachment=True, download_name=filename)
