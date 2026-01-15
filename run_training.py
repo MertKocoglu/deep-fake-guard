@@ -16,7 +16,7 @@ if gpus:
     except RuntimeError as e:
         print(f"GPU configuration error: {e}")
 else:
-    print("⚠️  No GPU detected, using CPU")
+    print("No GPU detected, using CPU")
 
 def main():
     """Main training function."""
@@ -66,9 +66,9 @@ def main():
                 epochs=EPOCHS, 
                 batch_size=BATCH_SIZE
             )
-            print("✓ Basic CNN training completed successfully!")
+            print("Basic CNN training completed successfully!")
         except Exception as e:
-            print(f"✗ Basic CNN training failed: {e}")
+            print(f"Basic CNN training failed: {e}")
             return False
         
         # 2. Train Advanced CNN
@@ -79,9 +79,9 @@ def main():
                 epochs=EPOCHS, 
                 batch_size=BATCH_SIZE
             )
-            print("✓ Advanced CNN training completed successfully!")
+            print("Advanced CNN training completed successfully!")
         except Exception as e:
-            print(f"✗ Advanced CNN training failed: {e}")
+            print(f"Advanced CNN training failed: {e}")
             print("Continuing with other models...")
         
         # 3. Train Hybrid Model
@@ -91,9 +91,9 @@ def main():
                 epochs=EPOCHS, 
                 batch_size=BATCH_SIZE
             )
-            print("✓ Hybrid model training completed successfully!")
+            print("Hybrid model training completed successfully!")
         except Exception as e:
-            print(f"✗ Hybrid model training failed: {e}")
+            print(f"Hybrid model training failed: {e}")
             print("Continuing with evaluation...")
         
         # 4. Evaluate Models
@@ -160,7 +160,7 @@ def main():
             
             return True
         else:
-            print("\n⚠️  No models were successfully evaluated.")
+            print("\nNo models were successfully evaluated.")
             return False
             
     except Exception as e:
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     success = main()
     
     if success:
-        print(f"\n🎉 Training completed successfully!")
+        print(f"\nTraining completed successfully!")
         print("You can find all results, models, and visualizations in the 'results/' directory.")
     else:
-        print(f"\n❌ Training failed. Please check the error messages above.")
+        print(f"\nTraining failed. Please check the error messages above.")
