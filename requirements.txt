@@ -21,9 +21,12 @@ seaborn>=0.12.0
 flask>=3.0.0
 werkzeug>=3.0.0
 flask-sqlalchemy>=3.0.0
+python-dotenv>=1.0.0
+
+# Database (PostgreSQL)
 psycopg2-binary>=2.9.0
 
-# PDF Report Generation
+# Report Generation
 reportlab>=4.0.0
 
 # Utility Libraries

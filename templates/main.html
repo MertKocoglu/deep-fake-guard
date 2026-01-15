@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepFake Guard - AI Audio Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated background particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            animation: float linear infinite;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* Main container */
+        .main-wrapper {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 0;
+            width: 100%;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 0 40px;
+            box-sizing: border-box;
+        }
+
+        /* Hero Section */
+        .hero-section {
+            text-align: center;
+            margin-bottom: 80px;
+        }
+
+        .logo-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 60px;
+            padding: 12px 30px 12px 12px;
+            margin-bottom: 40px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .logo-badge img {
+            width: 50px;
+            height: 50px;
+            filter: brightness(0) invert(1);
+            object-fit: contain;
+        }
+
+        .logo-badge-text {
+            color: white;
+            font-weight: 600;
+            font-size: 18px;
+            letter-spacing: -0.5px;
+        }
+
+        .hero-title {
+            font-size: clamp(42px, 7vw, 84px);
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 24px;
+            line-height: 1.1;
+            letter-spacing: -2px;
+            animation: fadeInUp 0.8s ease-out 0.2s both;
+        }
+
+        .hero-description {
+            font-size: clamp(18px, 2vw, 24px);
+            color: rgba(255, 255, 255, 0.8);
+            max-width: 700px;
+            margin: 0 auto 50px;
+            line-height: 1.6;
+            font-weight: 300;
+            animation: fadeInUp 0.8s ease-out 0.4s both;
+        }
+
+        /* CTA Buttons */
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: fadeInUp 0.8s ease-out 0.6s both;
+        }
+
+        .btn-modern {
+            padding: 18px 40px;
+            font-size: 17px;
+            font-weight: 600;
+            border-radius: 16px;
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
+            border: none;
+        }
+
+        .btn-primary-modern {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary-modern:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.6);
+            color: white;
+        }
+
+        .btn-secondary-modern {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary-modern:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-3px);
+            color: white;
+        }
+
+        /* Features Grid */
+        .features-section {
+            margin-bottom: 80px;
+            animation: fadeInUp 0.8s ease-out 0.8s both;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+
+        .feature-card-modern {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px 30px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card-modern::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            opacity: 0;
+            transition: opacity 0.4s;
+        }
+
+        .feature-card-modern:hover {
+            transform: translateY(-10px);
+            border-color: rgba(102, 126, 234, 0.5);
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+        }
+
+        .feature-card-modern:hover::before {
+            opacity: 1;
+        }
+
+        .feature-icon-modern {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .feature-icon-modern i {
+            font-size: 32px;
+            color: white;
+        }
+
+        .feature-title-modern {
+            font-size: 22px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .feature-description-modern {
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.7;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Stats Section */
+        .stats-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 30px;
+            padding: 60px 40px;
+            margin-bottom: 80px;
+            animation: fadeInUp 0.8s ease-out 1s both;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 56px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Final CTA */
+        .final-cta {
+            text-align: center;
+            animation: fadeInUp 0.8s ease-out 1.2s both;
+        }
+
+        .final-cta-title {
+            font-size: clamp(28px, 4vw, 42px);
+            font-weight: 700;
+            color: white;
+            margin-bottom: 50px;
+            line-height: 1.3;
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .container {
+                max-width: 100%;
+                padding: 0 40px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-wrapper {
+                padding: 30px 0;
+            }
+
+            .container {
+                padding: 0 20px;
+            }
+
+            .hero-section {
+                margin-bottom: 60px;
+            }
+
+            .logo-badge {
+                margin-bottom: 30px;
+                padding: 10px 20px 10px 10px;
+            }
+
+            .logo-badge img {
+                width: 40px;
+                height: 40px;
+            }
+
+            .logo-badge-text {
+                font-size: 16px;
+            }
+
+            .hero-title {
+                font-size: clamp(32px, 10vw, 48px);
+                letter-spacing: -1px;
+                margin-bottom: 20px;
+            }
+
+            .hero-description {
+                font-size: 16px;
+                margin-bottom: 40px;
+                padding: 0 10px;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+                width: 100%;
+                gap: 15px;
+            }
+
+            .btn-modern {
+                width: 100%;
+                justify-content: center;
+                padding: 16px 30px;
+                font-size: 16px;
+            }
+
+            .features-section {
+                margin-bottom: 60px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .feature-card-modern {
+                padding: 30px 25px;
+            }
+
+            .feature-icon-modern {
+                width: 60px;
+                height: 60px;
+                border-radius: 16px;
+            }
+
+            .feature-icon-modern i {
+                font-size: 28px;
+            }
+
+            .feature-title-modern {
+                font-size: 20px;
+            }
+
+            .feature-description-modern {
+                font-size: 14px;
+            }
+
+            .stats-section {
+                padding: 40px 25px;
+                margin-bottom: 60px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 30px;
+            }
+
+            .stat-value {
+                font-size: 38px;
+            }
+
+            .stat-label {
+                font-size: 13px;
+            }
+
+            .final-cta-title {
+                font-size: 28px;
+                margin-bottom: 35px;
+                padding: 0 10px;
+            }
+
+            .glow {
+                width: 400px;
+                height: 400px;
+            }
+
+            .glow-1 {
+                top: -200px;
+                left: -150px;
+            }
+
+            .glow-2 {
+                bottom: -200px;
+                right: -150px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero-title {
+                font-size: 28px;
+                letter-spacing: -0.5px;
+            }
+
+            .hero-description {
+                font-size: 15px;
+            }
+
+            .btn-modern {
+                padding: 14px 25px;
+                font-size: 15px;
+                gap: 8px;
+            }
+
+            .feature-card-modern {
+                padding: 25px 20px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 25px;
+            }
+
+            .stat-value {
+                font-size: 42px;
+            }
+
+            .final-cta-title {
+                font-size: 24px;
+            }
+        }
+
+        /* Glow effect */
+        .glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.3) 0%, transparent 70%);
+            filter: blur(80px);
+            pointer-events: none;
+        }
+
+        .glow-1 {
+            top: -300px;
+            left: -200px;
+        }
+
+        .glow-2 {
+            bottom: -300px;
+            right: -200px;
+            background: radial-gradient(circle, rgba(118, 75, 162, 0.3) 0%, transparent 70%);
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Background Particles -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Glow Effects -->
+    <div class="glow glow-1"></div>
+    <div class="glow glow-2"></div>
+
+    <div class="main-wrapper">
+        <div class="container">
+            <!-- Hero Section -->
+            <section class="hero-section">
+                <div class="logo-badge">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="DeepFake Guard">
+                    <span class="logo-badge-text">DeepFake Guard</span>
+                </div>
+
+                <h1 class="hero-title">
+                    Detect AI-Generated<br>Audio in Seconds
+                </h1>
+
+                <p class="hero-description">
+                    Powered by advanced CNN with 90% accuracy. Protect yourself from deepfake audio with our state-of-the-art AI detection system.
+                </p>
+
+                <div class="cta-buttons">
+                    <a href="{{ url_for('login') }}" class="btn-modern btn-primary-modern">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Get Started
+                    </a>
+                    <a href="{{ url_for('register') }}" class="btn-modern btn-secondary-modern">
+                        <i class="fas fa-user-plus"></i>
+                        Create Account
+                    </a>
+                </div>
+            </section>
+
+            <!-- Features Grid -->
+            <section class="features-section">
+                <div class="features-grid">
+                    <div class="feature-card-modern">
+                        <div class="feature-icon-modern">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <h3 class="feature-title-modern">AI-Powered Detection</h3>
+                        <p class="feature-description-modern">
+                            Advanced CNN architecture trained on 17,872 audio samples delivers 90% accuracy in detecting deepfake audio.
+                        </p>
+                    </div>
+
+                    <div class="feature-card-modern">
+                        <div class="feature-icon-modern">
+                            <i class="fas fa-microphone-alt"></i>
+                        </div>
+                        <h3 class="feature-title-modern">Real-Time Recording</h3>
+                        <p class="feature-description-modern">
+                            Record audio directly in your browser and get instant analysis results with detailed confidence scores.
+                        </p>
+                    </div>
+
+                    <div class="feature-card-modern">
+                        <div class="feature-icon-modern">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <h3 class="feature-title-modern">Visual Analytics</h3>
+                        <p class="feature-description-modern">
+                            Advanced mel-spectrogram and waveform visualizations help you understand the audio analysis process.
+                        </p>
+                    </div>
+
+                    <div class="feature-card-modern">
+                        <div class="feature-icon-modern">
+                            <i class="fas fa-file-download"></i>
+                        </div>
+                        <h3 class="feature-title-modern">Detailed Reports</h3>
+                        <p class="feature-description-modern">
+                            Download comprehensive TXT reports with technical metrics, confidence scores, and analysis details.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stats Section -->
+            <section class="stats-section">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-value">90%</span>
+                        <div class="stat-label">Accuracy</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">89.8%</span>
+                        <div class="stat-label">F1-Score</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">17.8K</span>
+                        <div class="stat-label">Samples</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">0.966</span>
+                        <div class="stat-label">ROC-AUC</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Final CTA -->
+            <section class="final-cta">
+                <h2 class="final-cta-title">
+                    Ready to detect deepfakes?
+                </h2>
+                <div class="cta-buttons">
+                    <a href="{{ url_for('login') }}" class="btn-modern btn-primary-modern">
+                        <i class="fas fa-rocket"></i>
+                        Start Analyzing Now
+                    </a>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // Create animated particles
+        const particlesContainer = document.getElementById('particles');
+        const particleCount = 50;
+
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            
+            const size = Math.random() * 4 + 2;
+            particle.style.width = size + 'px';
+            particle.style.height = size + 'px';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.animationDuration = (Math.random() * 20 + 10) + 's';
+            particle.style.animationDelay = Math.random() * 10 + 's';
+            
+            particlesContainer.appendChild(particle);
+        }
+    </script>
+</body>
+</html>

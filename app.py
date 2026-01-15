@@ -12,6 +12,7 @@ Date: 24 Haziran 2025
 
 import os
 import uuid
+import subprocess
 import librosa
 import numpy as np
 import tensorflow as tf
@@ -21,11 +22,16 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 import pickle
 from database import db, User, AnalysisHistory, init_db
+from dotenv import load_dotenv
 import matplotlib
 matplotlib.use('Agg')  # For non-interactive backend
 import matplotlib.pyplot as plt
 import io
 import base64
+
+# Load environment variables
+load_dotenv()
+
 try:
     from reportlab.lib.pagesizes import letter, A4
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
@@ -34,7 +40,7 @@ try:
     from reportlab.lib import colors
     REPORTLAB_AVAILABLE = True
 except ImportError:
-    print("⚠️  ReportLab not available. PDF reports will be disabled.")
+    print("ReportLab not available. PDF reports will be disabled.")
     REPORTLAB_AVAILABLE = False
 
 # Initialize Flask app
@@ -47,8 +53,8 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 
 # Database configuration
-# PostgreSQL for production-ready deployment
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'postgresql://ardaaltc@localhost/deepfake_guard'
+# PostgreSQL connection
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'postgresql://postgres:postgres@localhost:5432/deepfake_guard'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = False
 
@@ -85,23 +91,57 @@ def load_model_and_scaler():
         scaler_path = "results/feature_scaler.pkl"
         with open(scaler_path, 'rb') as f:
             scaler = pickle.load(f)
-        print("✅ Scaler loaded successfully!")
+        print("Scaler loaded successfully!")
         
         return True
     except Exception as e:
-        print(f"❌ Error loading model or scaler: {e}")
+        print(f"Error loading model or scaler: {e}")
         return False
 
 def allowed_file(filename):
     """Check if uploaded file is allowed."""
-    ALLOWED_EXTENSIONS = {'wav', 'mp3', 'flac', 'm4a', 'ogg'}
+    ALLOWED_EXTENSIONS = {'wav', 'mp3', 'flac', 'm4a', 'ogg', 'webm'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def convert_to_wav(input_path):
+    """Convert audio file to WAV format using ffmpeg if needed."""
+    # Check if file is already WAV
+    if input_path.lower().endswith('.wav'):
+        return input_path
+    
+    # Create output path
+    output_path = input_path.rsplit('.', 1)[0] + '_converted.wav'
+    
+    try:
+        import subprocess
+        # Convert using ffmpeg
+        cmd = [
+            'ffmpeg', '-y', '-i', input_path,
+            '-acodec', 'pcm_s16le',
+            '-ar', '16000',
+            '-ac', '1',
+            output_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode == 0 and os.path.exists(output_path):
+            print(f"Converted {input_path} to WAV format")
+            return output_path
+        else:
+            print(f"FFmpeg conversion failed: {result.stderr}")
+            return input_path
+    except Exception as e:
+        print(f"Error converting file: {e}")
+        return input_path
 
 def extract_audio_features(file_path):
     """Extract mel-spectrogram from audio file."""
     try:
+        # Convert to WAV if needed (for WebM and other formats)
+        wav_path = convert_to_wav(file_path)
+        
         # Load audio file (no duration limit) - keep original for duration calculation
-        audio_original, sr = librosa.load(file_path, sr=16000)
+        audio_original, sr = librosa.load(wav_path, sr=16000)
         original_duration = len(audio_original) / sr  # Calculate original duration
         
         # Copy audio for processing
@@ -335,10 +375,18 @@ def generate_pdf_report(result_data):
     return filename
 
 @app.route('/')
-@login_required
 def index():
-    """Main page with file upload."""
-    return render_template('index.html', username=session.get('username'))
+    """Main landing page."""
+    # Redirect to analyze if already logged in
+    if 'logged_in' in session:
+        return redirect(url_for('analyze'))
+    return render_template('main.html')
+
+@app.route('/analyze')
+@login_required
+def analyze():
+    """Analysis page with React interface."""
+    return render_template('react_app.html', username=session.get('username'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -363,16 +411,16 @@ def login():
             # Update last login
             user.update_last_login()
             
-            print(f"✅ Login successful for user: {username}")
-            return redirect(url_for('index'))
+            print(f"Login successful for user: {username}")
+            return redirect(url_for('analyze'))
         else:
-            print(f"❌ Login failed for user: {username}")
+            print(f"Login failed for user: {username}")
             return render_template('login.html', error='Invalid username or password')
     
     # Check if already logged in
     if 'logged_in' in session:
-        print(f"User {session.get('username')} already logged in, redirecting to index")
-        return redirect(url_for('index'))
+        print(f"User {session.get('username')} already logged in, redirecting to analyze")
+        return redirect(url_for('analyze'))
     
     return render_template('login.html')
 
@@ -419,17 +467,17 @@ def register():
             db.session.add(new_user)
             db.session.commit()
             
-            print(f"✅ New user registered: {username}")
+            print(f"New user registered: {username}")
             return render_template('register.html', success='Hesabınız başarıyla oluşturuldu! Şimdi giriş yapabilirsiniz.')
         
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error registering user: {e}")
+            print(f"Error registering user: {e}")
             return render_template('register.html', error='Kayıt sırasında bir hata oluştu')
     
     # Check if already logged in
     if 'logged_in' in session:
-        return redirect(url_for('index'))
+        return redirect(url_for('analyze'))
     
     return render_template('register.html')
 
@@ -442,12 +490,12 @@ def logout():
         if os.path.exists(old_filepath):
             try:
                 os.remove(old_filepath)
-                print(f"🗑️  Cleaned up file on logout: {old_filepath}")
+                print(f"Cleaned up file on logout: {old_filepath}")
             except Exception as e:
-                print(f"⚠️  Could not delete file on logout: {e}")
+                print(f"Could not delete file on logout: {e}")
     
     session.clear()
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 @app.route('/upload', methods=['POST'])
 @login_required
@@ -461,7 +509,7 @@ def upload_file():
         return jsonify({'error': 'No file selected'}), 400
     
     if not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid file format. Please upload WAV, MP3, FLAC, M4A, or OGG files.'}), 400
+        return jsonify({'error': 'Invalid file format. Please upload WAV, MP3, FLAC, M4A, OGG, or WEBM files.'}), 400
     
     try:
         # Delete previous uploaded file if exists
@@ -470,9 +518,9 @@ def upload_file():
             if os.path.exists(old_filepath):
                 try:
                     os.remove(old_filepath)
-                    print(f"🗑️  Deleted old file: {old_filepath}")
+                    print(f"Deleted old file: {old_filepath}")
                 except Exception as e:
-                    print(f"⚠️  Could not delete old file: {e}")
+                    print(f"Could not delete old file: {e}")
         
         # Generate unique filename
         file_id = str(uuid.uuid4())
@@ -487,9 +535,9 @@ def upload_file():
         # Store filepath in session for later cleanup
         session['last_uploaded_file'] = filepath
         
-        print(f"✅ File saved: {filepath}")
-        print(f"📁 File exists: {os.path.exists(filepath)}")
-        print(f"📊 File size: {os.path.getsize(filepath)} bytes")
+        print(f"File saved: {filepath}")
+        print(f"File exists: {os.path.exists(filepath)}")
+        print(f"File size: {os.path.getsize(filepath)} bytes")
         
         # Extract features
         spectrogram, audio, sr, original_duration = extract_audio_features(filepath)
@@ -518,9 +566,9 @@ def upload_file():
             'file_path': f'/uploads/{unique_filename}'  # Use unique_filename, not original filename
         }
         
-        print(f"🎵 Audio file path for playback: {response_data['file_path']}")
-        print(f"📂 Actual file on disk: {filepath}")
-        print(f"✅ File still exists: {os.path.exists(filepath)}")
+        print(f"Audio file path for playback: {response_data['file_path']}")
+        print(f"Actual file on disk: {filepath}")
+        print(f"File still exists: {os.path.exists(filepath)}")
         
         # Save analysis to database
         try:
@@ -536,9 +584,9 @@ def upload_file():
             )
             db.session.add(analysis)
             db.session.commit()
-            print(f"✅ Analysis saved to database for user {session.get('username')}")
+            print(f"Analysis saved to database for user {session.get('username')}")
         except Exception as db_error:
-            print(f"⚠️  Error saving to database: {db_error}")
+            print(f"Error saving to database: {db_error}")
             db.session.rollback()
         
         # Don't clean up uploaded file - keep it for playback
@@ -557,7 +605,7 @@ def generate_report():
     """Generate and download TXT report."""
     try:
         data = request.json
-        print(f"📝 Generating report for: {data.get('filename')}")
+        print(f"Generating report for: {data.get('filename')}")
         
         # Generate TXT report
         filename = f"deepfake_detection_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
@@ -626,15 +674,16 @@ Report ID: {filename.replace('.txt', '')}
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(report_content)
         
-        print(f"✅ Report generated: {filename}")
+        print(f"Report generated: {filename}")
         
         return jsonify({
             'success': True,
+            'filename': filename,
             'report_url': f'/download_report/{filename}'
         })
     
     except Exception as e:
-        print(f"❌ Error generating report: {e}")
+        print(f"Error generating report: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Error generating report: {str(e)}'}), 500
@@ -748,12 +797,12 @@ def get_stats():
         return "Report not found", 404
 
 if __name__ == '__main__':
-    print("🚀 Starting Deepfake Audio Detection Web Interface...")
+    print("Starting Deepfake Audio Detection Web Interface...")
     
     # Load model and scaler
     if load_model_and_scaler():
-        print("✅ System ready!")
-        print("🌐 Starting web server...")
+        print("System ready!")
+        print("Starting web server...")
         app.run(debug=True, host='0.0.0.0', port=8080)
     else:
-        print("❌ Failed to load model. Please check the model files.")
+        print("Failed to load model. Please check the model files.")

@@ -1,0 +1,198 @@
+:root {
+  --primary-color: #4a90e2;
+  --success-color: #28a745;
+  --danger-color: #dc3545;
+  --warning-color: #ffc107;
+  --info-color: #17a2b8;
+  --dark-color: #343a40;
+  --light-color: #f8f9fa;
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-success: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  --gradient-danger: linear-gradient(135deg, #ff5f6d 0%, #ffc371 100%);
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  margin: 0;
+}
+
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-attachment: fixed;
+}
+
+/* Hero Section */
+.hero-section {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  padding: 4rem 0;
+  color: white;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.hero-section h1 {
+  font-weight: 700;
+  margin-bottom: 2rem;
+}
+
+.hero-section .lead {
+  font-size: 1.2rem;
+  line-height: 1.6;
+}
+
+/* Cards */
+.card {
+  border-radius: 15px;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95);
+  border: none;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2) !important;
+}
+
+.card-header {
+  border-radius: 15px 15px 0 0 !important;
+  padding: 1.5rem;
+  font-weight: 600;
+}
+
+/* Upload Area */
+.upload-area {
+  border: 3px dashed #ccc;
+  border-radius: 15px;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, rgba(74, 144, 226, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+}
+
+.upload-area:hover {
+  border-color: var(--primary-color);
+  background: linear-gradient(135deg, rgba(74, 144, 226, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+  transform: scale(1.02);
+}
+
+.upload-icon {
+  font-size: 4rem;
+  color: var(--primary-color);
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+}
+
+.upload-area:hover .upload-icon {
+  transform: scale(1.1);
+  color: var(--success-color);
+}
+
+/* Result Box */
+.result-box {
+  text-align: center;
+  padding: 2rem;
+  border-radius: 15px;
+  margin-bottom: 1rem;
+}
+
+.result-box.real {
+  background: var(--gradient-success);
+  color: white;
+}
+
+.result-box.fake {
+  background: var(--gradient-danger);
+  color: white;
+}
+
+.result-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.result-icon i {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.confidence {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+/* File Info */
+.file-info {
+  background: rgba(248, 249, 250, 0.8);
+  padding: 1.5rem;
+  border-radius: 10px;
+  border-left: 4px solid var(--primary-color);
+}
+
+.file-info h5 {
+  color: var(--dark-color);
+  margin-bottom: 1rem;
+}
+
+.file-info td {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 300px;
+}
+
+/* Technical Details */
+.tech-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.tech-detail:last-child {
+  border-bottom: none;
+}
+
+/* Buttons */
+.btn {
+  border-radius: 25px;
+  padding: 0.75rem 2rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  border: none;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.btn-lg {
+  padding: 1rem 2.5rem;
+  font-size: 1.1rem;
+}
+
+/* Navbar */
+.navbar {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Recording animations */
+.fa-beat {
+  animation: beat 1s ease-in-out infinite;
+}
+
+@keyframes beat {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}

@@ -69,6 +69,10 @@
             color: white;
         }
 
+        .login-icon img {
+            filter: brightness(0) invert(1);
+        }
+
         .login-title {
             color: #333;
             font-weight: 700;
@@ -181,7 +185,7 @@
         <div class="login-card">
             <div class="login-header">
                 <div class="login-icon">
-                    <i class="fas fa-shield-alt"></i>
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 70px; width: 70px; object-fit: contain; display: block;" />
                 </div>
                 <h1 class="login-title">DeepFake Guard</h1>
                 <p class="login-subtitle">AI-Powered Deepfake Detection System</p>
