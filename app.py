@@ -16,7 +16,7 @@ import librosa
 import numpy as np
 import tensorflow as tf
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, redirect, url_for, session
 from werkzeug.utils import secure_filename
 from functools import wraps
 import pickle
@@ -100,10 +100,14 @@ def allowed_file(filename):
 def extract_audio_features(file_path):
     """Extract mel-spectrogram from audio file."""
     try:
-        # Load audio file
-        audio, sr = librosa.load(file_path, sr=16000, duration=2.0)
+        # Load audio file (no duration limit) - keep original for duration calculation
+        audio_original, sr = librosa.load(file_path, sr=16000)
+        original_duration = len(audio_original) / sr  # Calculate original duration
         
-        # Ensure audio is exactly 2 seconds
+        # Copy audio for processing
+        audio = audio_original.copy()
+        
+        # Ensure audio is exactly 4 seconds for processing
         target_length = 4 * 16000
         if len(audio) < target_length:
             # Pad with zeros if too short
@@ -146,11 +150,13 @@ def extract_audio_features(file_path):
         # Add channel dimension for CNN
         mel_spectrogram_db = mel_spectrogram_db[..., np.newaxis]
         
-        return mel_spectrogram_db, audio, sr
+        return mel_spectrogram_db, audio_original, sr, original_duration
     
     except Exception as e:
         print(f"Error extracting features: {e}")
-        return None, None, None
+        import traceback
+        traceback.print_exc()
+        return None, None, None, None
 
 def predict_deepfake(spectrogram):
     """Predict if audio is deepfake using the trained model."""
@@ -430,6 +436,16 @@ def register():
 @app.route('/logout')
 def logout():
     """Logout user."""
+    # Clean up uploaded file before logout
+    if 'last_uploaded_file' in session:
+        old_filepath = session['last_uploaded_file']
+        if os.path.exists(old_filepath):
+            try:
+                os.remove(old_filepath)
+                print(f"🗑️  Cleaned up file on logout: {old_filepath}")
+            except Exception as e:
+                print(f"⚠️  Could not delete file on logout: {e}")
+    
     session.clear()
     return redirect(url_for('login'))
 
@@ -448,6 +464,16 @@ def upload_file():
         return jsonify({'error': 'Invalid file format. Please upload WAV, MP3, FLAC, M4A, or OGG files.'}), 400
     
     try:
+        # Delete previous uploaded file if exists
+        if 'last_uploaded_file' in session:
+            old_filepath = session['last_uploaded_file']
+            if os.path.exists(old_filepath):
+                try:
+                    os.remove(old_filepath)
+                    print(f"🗑️  Deleted old file: {old_filepath}")
+                except Exception as e:
+                    print(f"⚠️  Could not delete old file: {e}")
+        
         # Generate unique filename
         file_id = str(uuid.uuid4())
         filename = secure_filename(file.filename)
@@ -458,8 +484,15 @@ def upload_file():
         # Save uploaded file
         file.save(filepath)
         
+        # Store filepath in session for later cleanup
+        session['last_uploaded_file'] = filepath
+        
+        print(f"✅ File saved: {filepath}")
+        print(f"📁 File exists: {os.path.exists(filepath)}")
+        print(f"📊 File size: {os.path.getsize(filepath)} bytes")
+        
         # Extract features
-        spectrogram, audio, sr = extract_audio_features(filepath)
+        spectrogram, audio, sr, original_duration = extract_audio_features(filepath)
         if spectrogram is None:
             return jsonify({'error': 'Error processing audio file'}), 500
         
@@ -481,8 +514,13 @@ def upload_file():
             'threshold_used': result['threshold_used'],
             'plot_data': plot_data,
             'file_size': os.path.getsize(filepath),
-            'duration': len(audio) / sr
+            'duration': original_duration,  # Use original duration, not processed
+            'file_path': f'/uploads/{unique_filename}'  # Use unique_filename, not original filename
         }
+        
+        print(f"🎵 Audio file path for playback: {response_data['file_path']}")
+        print(f"📂 Actual file on disk: {filepath}")
+        print(f"✅ File still exists: {os.path.exists(filepath)}")
         
         # Save analysis to database
         try:
@@ -503,8 +541,9 @@ def upload_file():
             print(f"⚠️  Error saving to database: {db_error}")
             db.session.rollback()
         
-        # Clean up uploaded file
-        os.remove(filepath)
+        # Don't clean up uploaded file - keep it for playback
+        # File will be accessible via /uploads/<filename> route
+        # os.remove(filepath)  # Commented out to allow audio playback
         
         return jsonify(response_data)
     
@@ -607,6 +646,35 @@ def download_report(filename):
     try:
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         return send_file(filepath, as_attachment=True, download_name=filename)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
+
+@app.route('/uploads/<filename>')
+@login_required
+def serve_upload(filename):
+    """Serve uploaded audio files for playback."""
+    try:
+        # Get file extension to determine MIME type
+        ext = filename.rsplit('.', 1)[-1].lower()
+        
+        # MIME type mapping for audio files
+        mime_types = {
+            'wav': 'audio/wav',
+            'mp3': 'audio/mpeg',
+            'flac': 'audio/flac',
+            'm4a': 'audio/mp4',
+            'ogg': 'audio/ogg',
+            'webm': 'audio/webm'
+        }
+        
+        mimetype = mime_types.get(ext, 'audio/mpeg')
+        
+        return send_from_directory(
+            app.config['UPLOAD_FOLDER'], 
+            filename,
+            mimetype=mimetype,
+            as_attachment=False
+        )
     except Exception as e:
         return jsonify({'error': str(e)}), 404
 

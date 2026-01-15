@@ -66,10 +66,42 @@
                             <input type="file" id="file-input" accept=".wav,.mp3,.flac,.m4a,.ogg" style="display: none;">
                         </div>
                         
+                        <div class="text-center my-3">
+                            <div class="d-inline-block px-3 py-2 bg-light rounded">
+                                <span class="text-muted fw-bold">OR</span>
+                            </div>
+                        </div>
+
+                        <!-- Microphone Recording Section -->
+                        <div class="record-section p-3 border rounded" style="background: linear-gradient(135deg, rgba(220, 53, 69, 0.1) 0%, rgba(255, 193, 7, 0.1) 100%);">
+                            <div class="alert alert-warning small mb-3" role="alert">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Note:</strong> Recorded audio may not work on all browsers. For best results, upload an audio file directly.
+                            </div>
+                            <div class="text-center">
+                                <i class="fas fa-microphone fa-3x text-danger mb-3"></i>
+                                <h5>Record from Microphone</h5>
+                                <p class="text-muted small mb-3">Record audio and analyze directly</p>
+                                <button id="record-btn" class="btn btn-danger btn-lg">
+                                    <i class="fas fa-microphone me-2"></i>
+                                    Start Recording
+                                </button>
+                                <button id="stop-record-btn" class="btn btn-secondary btn-lg" style="display: none;">
+                                    <i class="fas fa-stop me-2"></i>
+                                    Stop Recording
+                                </button>
+                                <div id="recording-timer" class="mt-2 fw-bold text-danger" style="display: none; font-size: 1.2rem;">
+                                    <i class="fas fa-circle fa-beat" style="font-size: 0.8rem;"></i>
+                                    <span id="timer-display">0:00</span>
+                                </div>
+                                <div id="recording-status" class="mt-2 text-muted small"></div>
+                            </div>
+                        </div>
+                        
                         <div class="mt-3">
                             <small class="text-muted">
                                 <i class="fas fa-info-circle me-1"></i>
-                                Supported formats: WAV, MP3, FLAC, M4A, OGG • Max size: 16MB • Duration: up to 2 seconds
+                                Supported formats: WAV, MP3, FLAC, M4A, OGG • Max size: 16MB
                             </small>
                         </div>
                         
@@ -186,11 +218,26 @@
                             </div>
                         </div>
 
+                        <!-- Audio Player -->
+                        <div class="mt-4 text-center">
+                            <audio id="audio-player" controls preload="metadata" style="max-width: 100%; width: 500px;">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </div>
+
                         <!-- Action Buttons -->
                         <div class="mt-4 text-center">
+                            <button id="play-audio-btn" class="btn btn-info btn-lg me-3">
+                                <i class="fas fa-play me-2"></i>
+                                Play Audio
+                            </button>
                             <button id="download-report-btn" class="btn btn-primary btn-lg me-3">
                                 <i class="fas fa-download me-2"></i>
                                 Download Report (TXT)
+                            </button>
+                            <button id="download-audio-btn" class="btn btn-success btn-lg me-3" style="display: none;">
+                                <i class="fas fa-file-audio me-2"></i>
+                                Download Recorded Audio
                             </button>
                             <button id="analyze-another-btn" class="btn btn-outline-secondary btn-lg">
                                 <i class="fas fa-redo me-2"></i>
